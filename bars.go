@@ -41,12 +41,11 @@ import (
 	"github.com/martinohmann/barista-contrib/modules/ip/ipify"
 	"github.com/martinohmann/barista-contrib/modules/keyboard"
 	"github.com/martinohmann/barista-contrib/modules/keyboard/xkbmap"
-	"github.com/martinohmann/barista-contrib/modules/updates"
-	"github.com/martinohmann/barista-contrib/modules/updates/pacman"
 	"github.com/martinohmann/barista-contrib/modules/weather/openweathermap"
+	psysfs "github.com/prometheus/procfs/sysfs"
+
 	"github.com/martinohmann/i3-barista/internal/keyring"
 	"github.com/martinohmann/i3-barista/internal/notify"
-	psysfs "github.com/prometheus/procfs/sysfs"
 )
 
 func init() {
@@ -143,7 +142,7 @@ var barFactoryFuncs = map[string]func(registry *modules.Registry) error{
 				}), nil
 			}).
 			Add(
-				cputemp.OfType("acpitz").Output(func(t unit.Temperature) bar.Output {
+				cputemp.New().Output(func(t unit.Temperature) bar.Output {
 					out := outputs.Textf(" %.0f°C", t.Celsius())
 					switch {
 					case t.Celsius() > 85:
@@ -158,16 +157,16 @@ var barFactoryFuncs = map[string]func(registry *modules.Registry) error{
 
 					return out
 				}),
-				pacman.New().Output(func(info updates.Info) bar.Output {
-					if info.Updates == 0 {
-						return nil
-					}
-
-					return outputs.Textf(" %d", info.Updates).
-						OnClick(click.Left(func() {
-							notify.Send("Available Pacman Updates", info.PackageDetails.String())
-						}))
-				}),
+				// pacman.New().Output(func(info updates.Info) bar.Output {
+				// 	if info.Updates == 0 {
+				// 		return nil
+				// 	}
+				//
+				// 	return outputs.Textf(" %d", info.Updates).
+				// 		OnClick(click.Left(func() {
+				// 			notify.Send("Available Pacman Updates", info.PackageDetails.String())
+				// 		}))
+				// }),
 				wlan.Any().Output(func(info wlan.Info) bar.Output {
 					onClick := click.RunLeft("urxvt", "-name", "nmtui", "-geometry", "100x40", "-e", "nmtui-connect")
 
