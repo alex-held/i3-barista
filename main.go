@@ -10,8 +10,8 @@ import (
 
 	barista "barista.run"
 	"barista.run/oauth"
+	"github.com/alex-held/i3-barista/internal/keyring"
 	"github.com/martinohmann/barista-contrib/modules"
-	"github.com/martinohmann/i3-barista/internal/keyring"
 	"github.com/spf13/cobra"
 )
 
@@ -44,7 +44,9 @@ type options struct {
 }
 
 func (o *options) Run() error {
+
 	registerModules, ok := barFactoryFuncs[o.bar]
+
 	if !ok {
 		return fmt.Errorf("unsupported bar %q", o.bar)
 	}

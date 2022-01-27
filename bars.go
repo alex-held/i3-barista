@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"os/user"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -17,7 +18,6 @@ import (
 	"barista.run/group/switching"
 	"barista.run/modules/battery"
 	"barista.run/modules/clock"
-	"barista.run/modules/cputemp"
 	"barista.run/modules/diskspace"
 	"barista.run/modules/github"
 	"barista.run/modules/meminfo"
@@ -30,8 +30,8 @@ import (
 	"barista.run/modules/weather"
 	"barista.run/modules/wlan"
 	"barista.run/outputs"
+	"barista.run/pango"
 	"github.com/kirsle/configdir"
-	"github.com/martinlindhe/unit"
 	"github.com/martinohmann/barista-contrib/modules"
 	"github.com/martinohmann/barista-contrib/modules/cpufreq"
 	"github.com/martinohmann/barista-contrib/modules/cpufreq/sysfs"
@@ -39,14 +39,15 @@ import (
 	"github.com/martinohmann/barista-contrib/modules/dpms/xset"
 	"github.com/martinohmann/barista-contrib/modules/ip"
 	"github.com/martinohmann/barista-contrib/modules/ip/ipify"
-	"github.com/martinohmann/barista-contrib/modules/keyboard"
-	"github.com/martinohmann/barista-contrib/modules/keyboard/xkbmap"
 	"github.com/martinohmann/barista-contrib/modules/weather/openweathermap"
 	psysfs "github.com/prometheus/procfs/sysfs"
 
-	"github.com/martinohmann/i3-barista/internal/keyring"
-	"github.com/martinohmann/i3-barista/internal/notify"
+	"github.com/alex-held/i3-barista/internal/keyring"
+	"github.com/alex-held/i3-barista/internal/notify"
+	"github.com/alex-held/i3-barista/pkg/systemd"
 )
+
+var spacer = pango.Text(" ").XXSmall()
 
 func init() {
 	colors.LoadFromMap(map[string]string{
@@ -71,6 +72,24 @@ func init() {
 		"color14":  "#a3be8c",
 		"color15":  "#b48ead",
 	})
+}
+
+func home(paths ...string) string {
+
+	home, err := os.UserHomeDir()
+	// usr, err := user.Current()
+	if err != nil {
+		panic(err)
+	}
+
+	file, err := os.OpenFile("/tmp/i3-barista.log", os.O_CREATE|os.O_APPEND|os.O_RDWR, os.ModePerm)
+	if err != nil {
+		panic(err)
+	}
+
+	path := filepath.Join(append([]string{home}, paths...)...)
+	_, _ = file.WriteString(fmt.Sprintf("home: %s; path: %s\n", home, path))
+	return path
 }
 
 // barFactoryFuncs contains factory functions that populate the module registry
@@ -123,6 +142,84 @@ var barFactoryFuncs = map[string]func(registry *modules.Registry) error{
 					return out
 				}),
 			).
+
+			// // Battery
+			// Add(battery.All().Output(func(i battery.Info) bar.Output {
+			// 	if i.Status == battery.Disconnected || i.Status == battery.Unknown {
+			// 		return nil
+			// 	}
+
+			// 	iconName := "battery"
+			// 	if i.Status == battery.Charging {
+			// 		iconName += "-charging"
+			// 	}
+
+			// 	tenth := i.RemainingPct() / 10
+			// 	switch {
+			// 	case tenth == 0:
+			// 		iconName += "-outline"
+			// 	case tenth < 10:
+			// 		iconName += fmt.Sprintf("-%d0", tenth)
+			// 	}
+			// 	outputs.Group()
+			// 	out := outputs.Group()
+			// 	out.Append(outputs.Pango(
+			// 		pango.Icon("mdi-"+iconName).Alpha(0.6),
+			// 		pango.Textf("%d%%", i.RemainingPct()),
+			// 	))
+			// 	out.Append(outputs.Pango(
+			// 		pango.Textf("%4.1f/%4.1f", i.EnergyNow, i.EnergyFull),
+			// 		pango.Text("Wh").Smaller(),
+			// 	))
+			// 	switch {
+			// 	case i.RemainingPct() <= 5:
+			// 		out.Urgent(true)
+			// 	case i.RemainingPct() <= 15:
+			// 		out.Color(colors.Scheme("bad"))
+			// 	case i.RemainingPct() <= 25:
+			// 		out.Color(colors.Scheme("degraded"))
+			// 	}
+			// 	return out
+			// })).
+
+			// VOLUME
+			// Add(volume.New(alsa.DefaultMixer()).Output(func(v volume.Volume) bar.Output {
+			// 	if v.Mute {
+			// 		return outputs.
+			// 			Pango(pango.Icon("mdi-volume-off").Alpha(0.8), spacer, "MUT").
+			// 			Color(colors.Scheme("degraded"))
+			// 	}
+			// 	iconName := "low"
+			// 	pct := v.Pct()
+			// 	if pct > 66 {
+			// 		iconName = "high"
+			// 	} else if pct > 33 {
+			// 		iconName = "medium"
+			// 	}
+			// 	return outputs.Pango(
+			// 		pango.Icon("mdi-volume-"+iconName).Alpha(0.6),
+			// 		spacer,
+			// 		pango.Textf("%2d%%", pct),
+			// 	)
+			// })).
+
+			// WLAN
+			// Add(wlan.Any().Output(func(i wlan.Info) bar.Output {
+			// 	switch {
+			// 	case !i.Enabled():
+			// 		return nil
+			// 	case i.Connecting():
+			// 		return outputs.Text("W: ...")
+			// 	case !i.Connected():
+			// 		return outputs.Text("W: down")
+			// 	case len(i.IPs) < 1:
+			// 		return outputs.Textf("%s (...)", i.SSID)
+			// 	default:
+			// 		return outputs.Textf("%s (%s)", i.SSID, i.IPs[0])
+			// 	}
+			// })).
+
+			// VOLUME
 			Addf(func() (bar.Module, error) {
 				u, err := user.Current()
 				if err != nil {
@@ -141,51 +238,35 @@ var barFactoryFuncs = map[string]func(registry *modules.Registry) error{
 					return outputs.Textf("墳 %d%%", v.Pct())
 				}), nil
 			}).
-			Add(
-				cputemp.New().Output(func(t unit.Temperature) bar.Output {
-					out := outputs.Textf(" %.0f°C", t.Celsius())
-					switch {
-					case t.Celsius() > 85:
-						out = out.Color(colors.Scheme("critical"))
-					case t.Celsius() > 80:
-						out = out.Color(colors.Scheme("color11"))
-					case t.Celsius() > 75:
-						out = out.Color(colors.Scheme("color12"))
-					case t.Celsius() > 70:
-						out = out.Color(colors.Scheme("color13"))
-					}
 
-					return out
-				}),
-				// pacman.New().Output(func(info updates.Info) bar.Output {
-				// 	if info.Updates == 0 {
-				// 		return nil
-				// 	}
-				//
-				// 	return outputs.Textf(" %d", info.Updates).
-				// 		OnClick(click.Left(func() {
-				// 			notify.Send("Available Pacman Updates", info.PackageDetails.String())
-				// 		}))
-				// }),
-				wlan.Any().Output(func(info wlan.Info) bar.Output {
-					onClick := click.RunLeft("urxvt", "-name", "nmtui", "-geometry", "100x40", "-e", "nmtui-connect")
+			// systemD
+			Add(systemd.NewSystemdUserService("tproxy"), systemd.NewSystemdUserService("dhc-vpn")).
 
-					switch {
-					case !info.Enabled():
-						return nil
-					case info.Connecting():
-						return outputs.Text(" ...").Color(colors.Scheme("disabled")).OnClick(onClick)
-					case !info.Connected():
-						return outputs.Text(" disconnected").Color(colors.Scheme("disabled")).OnClick(onClick)
-					default:
-						return outputs.Textf(" %s", info.SSID).OnClick(onClick)
-					}
-				}),
-				xkbmap.New("us", "de").Output(func(layout keyboard.Layout) bar.Output {
-					return outputs.Textf("⌨ %s", strings.ToUpper(layout.Name))
-				}),
-				static.New(outputs.Text("").OnClick(click.RunLeft("dmenu_session"))),
+			// WLAN
+			Add(wlan.Any().Output(func(info wlan.Info) bar.Output {
+				onClick := click.RunLeft("gnome-terminal", "nmtui-connect")
+				switch {
+				case !info.Enabled():
+					return nil
+				case info.Connecting():
+					return outputs.Text(" ...").Color(colors.Scheme("disabled")).OnClick(onClick)
+				case !info.Connected():
+					return outputs.Text(" disconnected").Color(colors.Scheme("disabled")).OnClick(onClick)
+				default:
+					return outputs.Textf(" %s", info.SSID).OnClick(onClick)
+				}
+			}),
+
+			// KEYMAP
+			// xkbmap.New("us", "de").Output(func(layout keyboard.Layout) bar.Output {
+			// 	return outputs.Textf("⌨ %s", strings.ToUpper(layout.Name))
+			// }),
+
+			// SESSION
+			// static.New(outputs.Text("").OnClick(click.RunLeft("dmenu_session"))),
 			).
+
+			// CALENDAR
 			Addf(func() (bar.Module, error) {
 				replacer := strings.NewReplacer(
 					"\u001b[7m", `<span foreground="#000000" background="#ffffff"><b>`,
@@ -204,8 +285,7 @@ var barFactoryFuncs = map[string]func(registry *modules.Registry) error{
 						}))
 				})
 				return mod, nil
-			}).
-			Err()
+			}).Err()
 	},
 	"bottom": func(registry *modules.Registry) error {
 		return registry.

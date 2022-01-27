@@ -14,8 +14,12 @@ build: ## build i3-barista
 	go build -ldflags "-s -w" -o i3-barista
 
 .PHONY: install
-install: build ## install i3-barista
+install: build clean ## install i3-barista
 	cp i3-barista $(GOPATH)/bin
+
+.PHONY: clean
+clean:
+	rm -f $(GOPATH)/bin/i3-barista
 
 .PHONY: test
 test: ## run tests
